@@ -1,7 +1,6 @@
 #Age at menopause-discovery dataset
 ANM_GWAS_ukb <- read_delim("continuous-3581-both_sexes-irnt.tsv.bgz",delim="\t")
 ANM_GWAS_ukb <- na.omit(ANM_GWAS_ukb)
-save(ANM_GWAS_ukb, file = "ANM_GWAS_ukb.RData")
 target_match <- unite(target_100kb, "target", c("SNPChr", "SNPPos"), sep = ":", remove = F)
 ANM_match <- unite(ANM_GWAS_ukb , "target", c("chr", "pos"), sep = ":", remove = F)
 ANM_GWAS_SNP <- merge(target_match, ANM_match , by = "target")
@@ -10,6 +9,14 @@ ANM_GWAS_SNP$pvalue <- 10^(-ANM_GWAS_SNP$neglog10_pval_EUR)
 library(TwoSampleMR)
 ANM_ukb_TwoSample <- format_data(ANM_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
                                   effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
+
+#Age at menopause-discovery dataset-all
+library(TwoSampleMR)
+ANM_ukb_TwoSample <- format_data(ANM_GWAS_ukb, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
+                                  effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
+target_match <- unite(target_100kb, "target", c("SNPChr", "SNPPos"), sep = ":", remove = F)
+PCOS_match <- unite(ANM_GWAS_ukb , "target", c("chr", "pos"), sep = ":", remove = F)
+ANM_GWAS_SNP <- merge(target_match, PCOS_match , by = "target")
 
 #Age at menopause-replication dataset
 library(tidyverse)
