@@ -1,16 +1,31 @@
-#Age at menopause
+#Age at menopause-discovery dataset
 ANM_GWAS_ukb <- read_delim("continuous-3581-both_sexes-irnt.tsv.bgz",delim="\t")
 ANM_GWAS_ukb <- na.omit(ANM_GWAS_ukb)
 save(ANM_GWAS_ukb, file = "ANM_GWAS_ukb.RData")
 target_match <- unite(target_100kb, "target", c("SNPChr", "SNPPos"), sep = ":", remove = F)
 ANM_match <- unite(ANM_GWAS_ukb , "target", c("chr", "pos"), sep = ":", remove = F)
 ANM_GWAS_SNP <- merge(target_match, ANM_match , by = "target")
-
 ANM_GWAS_SNP$pvalue <- 10^(-ANM_GWAS_SNP$neglog10_pval_EUR)
 
 library(TwoSampleMR)
 ANM_ukb_TwoSample <- format_data(ANM_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
                                   effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
+
+#Age at menopause-replication dataset
+library(tidyverse)
+library(data.table)
+ANM_GWAS <- fread("Menopause_HapMap_for_website_18112015.txt")
+ANM_GWAS$Effect_allele <- toupper(ANM_GWAS$allele1)
+ANM_GWAS$Other_allele <- toupper(ANM_GWAS$allele2)
+target_100kb <- subset(target_100kb, Pvalue < 5e-8)
+ANM_GWAS_SNP <- merge(target_100kb, ANM_GWAS , by.x = "SNP", by.y= "MarkerName")
+
+library(TwoSampleMR)
+ANM_TwoSample <- format_data(ANM_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='effect', se_col='stderr', eaf_col = 'HapMap_eaf',
+                              chr_col = 'SNPChr', pos_col = 'SNPPos',
+                              effect_allele_col='Effect_allele', other_allele_col='Other_allele', pval='p', 
+                              gene_col='GeneSymbol')
+ANM_TwoSample <- subset(ANM_TwoSample, ANM_TwoSample$beta.outcome !="0")
 
 #Primary ovarian failure
 library(data.table)
@@ -63,8 +78,7 @@ ALLB_match <- unite(ALLB_GWAS_ukb , "target", c("chr", "pos"), sep = ":", remove
 target <- data.frame(target = target_match$target, SNP=target_match$SNP)
 ALLB_GWAS_SNP <- merge(target, ALLB_match , by = "target")
 ALLB_GWAS_SNP$pvalue <- 10^(-ALLB_GWAS_SNP$neglog10_pval_EUR)
-save(AFLB_GWAS_SNP, file = "ALLB_GWAS_SNP.RData")
 
 library(TwoSampleMR)
-ANM_ukb_TwoSample <- format_data(AFLB_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
+ALLB_ukb_TwoSample <- format_data(ALLB_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
                                  effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
