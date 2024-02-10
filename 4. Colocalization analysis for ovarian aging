@@ -1,0 +1,122 @@
+Colocalization analysis for ovarian aging
+library(data.table)
+library(tidyverse)
+library(TwoSampleMR)
+cis_eQTL <- fread("D:/R Packages and project/R project/MR_test/Aortic/2019-12-11-cis-eQTLsFDR0.05-ProbeLevel-CohortInfoRemoved-BonferroniAdded.txt/cis_eQTL.txt",
+                  header=T,check.names=F,sep="\t")
+target_gene_list <- unique(ANM_ukb_Day_rep$exposure)
+sig_eQTL <- subset(cis_eQTL, GeneSymbol %in% target_gene_list )
+freq <- fread("D:/R Packages and project/R project/MR_test/Aortic/2018-07-18_SNP_AF_for_AlleleB_combined_allele_counts_and_MAF_pos_added.txt")
+sig_eQTL$beta <- sig_eQTL$Zscore / sqrt(2 * freq$AlleleB_all[match(sig_eQTL$SNP, freq$SNP)] * 
+                                          (1-freq$AlleleB_all[match(sig_eQTL$SNP, freq$SNP)]) *
+                                          (sig_eQTL$NrSamples + sig_eQTL$Zscore^2))
+sig_eQTL$se <- 1 / sqrt(2 * freq$AlleleB_all[match(sig_eQTL$SNP, freq$SNP)] * 
+                          (1-freq$AlleleB_all[match(sig_eQTL$SNP, freq$SNP)]) * 
+                          (sig_eQTL$NrSamples + sig_eQTL$Zscore^2))
+sig_eQTL$eaf <- freq$AlleleB_all[match(sig_eQTL$SNP, freq$SNP)]
+sig_eQTL$eaf[which(sig_eQTL$eaf>0.5)]<- 1-sig_eQTL$eaf[which(sig_eQTL$eaf>0.5)]
+eSNP_list = sapply(
+  X = unique(sig_eQTL[["GeneSymbol"]]),
+  FUN = function(target_gene_list) {
+    sig_eQTL %>% 
+      subset(GeneSymbol == target_gene_list)
+  },
+  simplify = FALSE,
+  USE.NAMES = TRUE
+)
+
+alltop_SNP <- mapply(
+  FUN = function(df_1) {
+    df_1 = subset(df_1, Pvalue == min(df_1$Pvalue))},
+  df_1      = eSNP_list,
+  SIMPLIFY  = FALSE,
+  USE.NAMES = TRUE
+)
+
+for (i in 1:12) {
+  if (nrow(alltop_SNP[[i]])>1){
+    alltop_SNP[[i]] <-  alltop_SNP[[i]][order(alltop_SNP[[i]]$Pvalue),][1, ]
+  }
+}
+
+curr_eQTL <-  list()
+for (i in 1:12) {
+  curr_eQTL[[i]] <-  subset(sig_eQTL , SNPPos  <= alltop_SNP[[i]]$SNPPos+ 100000 &
+                              SNPPos  >= alltop_SNP[[i]]$SNPPos- 100000 & SNPChr %in% alltop_SNP[[i]]$SNPChr &
+                              GeneSymbol == names(alltop_SNP[i]))
+}
+names(curr_eQTL) <- names(alltop_SNP)
+
+curr_GWAS <-  mapply(
+  FUN = function(df_1) {
+    df_1 = subset(ANM_all_ukb_TwoSample, pos.outcome  <= df_1$SNPPos+ 100000 &
+                    pos.outcome  >= df_1$SNPPos- 100000 & chr.outcome %in% df_1$SNPChr)},
+  df_1      = alltop_SNP ,
+  SIMPLIFY  = FALSE,
+  USE.NAMES = TRUE
+)
+
+curr_eQTL_overlap <-  mapply(
+  FUN = function(df_1, df_2) {
+    df_1 = df_1 %>%
+      .[which(.$SNP %in% df_2$SNP),] %>%
+      .[order(.$SNP),] %>%
+      .[!duplicated(.$SNP), ]},
+  df_1      = curr_eQTL,
+  df_2      = curr_GWAS,
+  SIMPLIFY  = FALSE,
+  USE.NAMES = TRUE
+)
+
+curr_GWAS_overlap <-  mapply(
+  FUN = function(df_1, df_2) {
+    df_1 = df_1 %>%
+      .[which(.$SNP %in% df_2$SNP),] %>%
+      .[order(.$SNP),] %>%
+      .[!duplicated(.$SNP), ]},
+  df_1      = curr_GWAS,
+  df_2      = curr_eQTL,
+  SIMPLIFY  = FALSE,
+  USE.NAMES = TRUE
+)
+
+for (i in 1:12) {
+  curr_GWAS_overlap[[i]]$eaf.outcome[which(curr_GWAS_overlap[[i]]$eaf.outcome>0.5)]<- 1-curr_GWAS_overlap[[i]]$eaf.outcome[which(curr_GWAS_overlap[[i]]$eaf.outcome>0.5)]
+  curr_GWAS_overlap[[i]]$varbeta = (curr_GWAS_overlap[[i]]$se.outcome)^2 
+  curr_GWAS_overlap[[i]]$N <- 130933
+}
+
+library(coloc)
+coloc_result = mapply(
+  FUN = function(df_1, df_2) { 
+    df_1 = list(beta = df_1$beta, varbeta = (df_1$se)^2, snp = df_1$SNP,
+                MAF = df_1$eaf, type = "quant", N= df_1$NrSamples)
+    df_2 = list(beta = df_2$beta.outcome, varbeta = (df_2$se.outcome)^2, snp = df_2$SNP,
+                MAF = df_2$eaf.outcome, type = "quant", N= df_2$N)
+    coloc_result = coloc.abf(
+      dataset1 = df_1,
+      dataset2 = df_2,
+      p1 = 1e-04, p2 = 1e-04, p12 = 1e-05
+    )
+  },
+  df_1      = curr_eQTL_overlap,
+  df_2      = curr_GWAS_overlap,
+  SIMPLIFY  = FALSE,
+  USE.NAMES = TRUE
+)
+
+sig <- as.character()
+PPH4<- as.numeric()
+PH_final <- data.frame()
+for (i in 1:12) {
+  PH4 <- bind_rows(coloc_result[[i]]$summary)$PP.H4.abf
+  PH <- bind_rows(coloc_result[[i]]$summary)
+  if (PH4> 0) {
+    sig <- c(sig, names(coloc_result[i]))
+    PPH4 <- c(PPH4, PH4)
+    PH <- bind_cols(PH, exposure = names(coloc_result[i]))
+    PH_final <- bind_rows(PH_final, PH)
+  }
+}
+sig_bind <- data.frame(exposure = sig, PPH4 = PPH4)
+sig_colocalization <-subset(sig_bind, sig_bind$PPH4>0.75)
