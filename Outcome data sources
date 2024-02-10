@@ -1,0 +1,70 @@
+#Age at menopause
+ANM_GWAS_ukb <- read_delim("continuous-3581-both_sexes-irnt.tsv.bgz",delim="\t")
+ANM_GWAS_ukb <- na.omit(ANM_GWAS_ukb)
+save(ANM_GWAS_ukb, file = "ANM_GWAS_ukb.RData")
+target_match <- unite(target_100kb, "target", c("SNPChr", "SNPPos"), sep = ":", remove = F)
+ANM_match <- unite(ANM_GWAS_ukb , "target", c("chr", "pos"), sep = ":", remove = F)
+ANM_GWAS_SNP <- merge(target_match, ANM_match , by = "target")
+
+ANM_GWAS_SNP$pvalue <- 10^(-ANM_GWAS_SNP$neglog10_pval_EUR)
+
+library(TwoSampleMR)
+ANM_ukb_TwoSample <- format_data(ANM_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
+                                  effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
+
+#Primary ovarian failure
+library(data.table)
+library(tidyverse)
+library(readr)
+library(openxlsx)
+POI_GWAS_Finn <- fread("finngen_R9_E4_OVARFAIL", header=T,check.names=F,sep="\t")
+POI_GWAS_Finn <- na.omit(POI_GWAS_Finn)
+
+library(liftOver)
+target_sig <- c("BRCA1","KLHL18", "PDIA3", "PNP","SRPK1")
+POI_GWAS_Finn_sig <- subset(POI_GWAS_Finn, nearest_genes%in%target_sig)
+POI_GWAS_Finn_sig$chr <- c("chr")
+POI_GWAS_Finn_sig <- unite(POI_GWAS_Finn_sig , "seqnames", c("chr","#chrom"), sep = "", remove = F)
+hg38.gr <- GRanges(seqnames=POI_GWAS_Finn_sig$seqnames, ranges=IRanges(start=POI_GWAS_Finn_sig$pos, width=1))
+ch <- import.chain('hg38ToHg19.over.chain')
+hg19.gr <- liftOver(hg38.gr, ch)
+hg19_POI <- as.data.frame(hg19.gr)
+POI_GWAS_Finn_sig_hg19 <- cbind(POI_GWAS_Finn_sig, hg_19 = hg19_POI$start)
+
+library(TwoSampleMR)
+target_TwoSample <- unite(target_TwoSample , "target", c("chr.exposure","pos.exposure"), sep = ":", remove = F)
+POI_GWAS_Finn_sig_hg19 <- unite(POI_GWAS_Finn_sig_hg19 , "target", c("#chrom","hg_19"), sep = ":", remove = F)
+POI_sig_hg19 <- merge(POI_GWAS_Finn_sig_hg19, target_TwoSample,by = "target")
+POI_Finn_TwoSample <- format_data(POI_sig_hg19, type='outcome', snp_col='rsids', beta_col='beta', se_col='sebeta',  eaf_col = 'af_alt',
+                                   effect_allele_col='alt', other_allele_col='ref', pval='pval', pos_col = 'pos.exposure', chr_col = 'chr.exposure')
+
+#Age at first live birth
+library(data.table)
+library(tidyverse)
+AFLB_GWAS_ukb <- read_delim("continuous-2754-both_sexes-irnt.tsv.bgz",delim="\t")
+AFLB_GWAS_ukb <- na.omit(AFLB_GWAS_ukb)
+target_match <- unite(target_100kb, "target", c("SNPChr", "SNPPos"), sep = ":", remove = F)
+AFLB_match <- unite(AFLB_GWAS_ukb , "target", c("chr", "pos"), sep = ":", remove = F)
+target <- data.frame(target = target_match$target, SNP=target_match$SNP)
+AFLB_GWAS_SNP <- merge(target, AFLB_match , by = "target")
+AFLB_GWAS_SNP$pvalue <- 10^(-AFLB_GWAS_SNP$neglog10_pval_EUR)
+
+library(TwoSampleMR)
+AFLB_ukb_TwoSample <- format_data(AFLB_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
+                                  effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
+
+#Age at last live birth
+library(tidyverse)
+library(R.utils)
+ALLB_GWAS_ukb <- read_delim("continuous-2764-both_sexes-irnt.tsv.bgz",delim="\t")
+ALLB_GWAS_ukb <- na.omit(ALLB_GWAS_ukb)
+target_match <- unite(target_100kb, "target", c("SNPChr", "SNPPos"), sep = ":", remove = F)
+ALLB_match <- unite(ALLB_GWAS_ukb , "target", c("chr", "pos"), sep = ":", remove = F)
+target <- data.frame(target = target_match$target, SNP=target_match$SNP)
+ALLB_GWAS_SNP <- merge(target, ALLB_match , by = "target")
+ALLB_GWAS_SNP$pvalue <- 10^(-ALLB_GWAS_SNP$neglog10_pval_EUR)
+save(AFLB_GWAS_SNP, file = "ALLB_GWAS_SNP.RData")
+
+library(TwoSampleMR)
+ANM_ukb_TwoSample <- format_data(AFLB_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
+                                 effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
