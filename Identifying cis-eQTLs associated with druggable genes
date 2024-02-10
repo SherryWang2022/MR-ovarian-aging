@@ -1,0 +1,28 @@
+Identifying cis-eQTLs associated with druggable genes
+library(data.table)
+library(tidyverse)
+library(TwoSampleMR)
+cis_eQTL <- fread("D:/R Packages and project/R project/MR_test/Aortic/2019-12-11-cis-eQTLsFDR0.05-ProbeLevel-CohortInfoRemoved-BonferroniAdded.txt/cis_eQTL.txt",
+                  header=T,check.names=F,sep="\t")
+library(openxlsx)
+drugable_target <- read.xlsx("D:/R Packages and project/R project/MR_test/Aortic/drugable_target.xlsx")
+target_in_eQTL <- subset(cis_eQTL, cis_eQTL$Gene %in% drugable_target$ensembl_gene_id)
+target_in_eQTL_location <- merge(target_in_eQTL, drugable_target, by.x = "Gene", by.y = "ensembl_gene_id")
+target_100kb <- subset(target_in_eQTL_location [,1:15], 
+                       target_in_eQTL_location$SNPPos  <= target_in_eQTL_location$end_b37+ 100000 &
+                         target_in_eQTL_location$SNPPos  >= target_in_eQTL_location$start_b37- 100000)
+target_gene <- subset(drugable_target, drugable_target$ensembl_gene_id
+                      %in% target_100kb$Gene)
+freq <- fread("D:/R Packages and project/R project/MR_test/Aortic/2018-07-18_SNP_AF_for_AlleleB_combined_allele_counts_and_MAF_pos_added.txt")
+target_100kb$beta <- target_100kb$Zscore / sqrt(2 * freq$AlleleB_all[match(target_100kb$SNP, freq$SNP)] * 
+                                                  (1-freq$AlleleB_all[match(target_100kb$SNP, freq$SNP)]) *
+                                                  (target_100kb$NrSamples + target_100kb$Zscore^2))
+target_100kb$se <- 1 / sqrt(2 * freq$AlleleB_all[match(target_100kb$SNP, freq$SNP)] * 
+                              (1-freq$AlleleB_all[match(target_100kb$SNP, freq$SNP)]) * 
+                              (target_100kb$NrSamples + target_100kb$Zscore^2))
+target_100kb$eaf <- freq$AlleleB_all[match(target_100kb$SNP, freq$SNP)]
+target_100kb <- subset(target_100kb, Pvalue < 5e-8)
+target_TwoSample <-format_data(target_100kb, type='exposure', snp_col='SNP', beta_col='beta', se_col='se', eaf_col = 'eaf',
+                               z_col = 'Zscore', samplesize_col = 'Nrsamples', chr_col = 'SNPChr', pos_col = 'SNPPos',
+                               effect_allele_col='AssessedAllele', other_allele_col='OtherAllele', pval='Pvalue', 
+                               gene_col='GeneSymbol', phenotype_col='GeneSymbol')
