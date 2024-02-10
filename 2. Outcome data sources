@@ -11,15 +11,14 @@ ANM_ukb_TwoSample <- format_data(ANM_GWAS_SNP, type='outcome', snp_col='SNP', be
                                   effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
 
 #Age at menopause-discovery dataset-all
-library(TwoSampleMR)
-cis_eQTL_match <- unite(cis_eQTL, "target", c("SNPChr", "SNPPos"), sep = ":", remove = F)
+target_match <- unite(target_in_eQTL_location, "target", c("SNPChr", "SNPPos"), sep = ":", remove = F)
 ANM_all_match <- unite(ANM_GWAS_ukb , "target", c("chr", "pos"), sep = ":", remove = F)
-ANM_all_GWAS_SNP <- merge(cis_eQTL_match, ANM_all_match, by = "target")
-ANM_all_GWAS_SNP$pvalue <- 10^(-ANM_GWAS_SNP$neglog10_pval_EUR)
+ANM_all_GWAS_SNP <- merge(target_match, ANM_all_match, by = "target")
+ANM_all_GWAS_SNP$pvalue <- 10^(-ANM_all_GWAS_SNP$neglog10_pval_EUR)
 
 library(TwoSampleMR)
 ANM_all_ukb_TwoSample <- format_data(ANM_all_GWAS_SNP, type='outcome', snp_col='SNP', beta_col='beta_EUR', se_col='se_EUR', eaf_col = 'af_EUR',
-                                  effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
+                                     effect_allele_col='alt', other_allele_col='ref', pval= 'pvalue')
 
 #Age at menopause-replication dataset
 library(tidyverse)
