@@ -2,7 +2,7 @@
 library(data.table)
 library(tidyverse)
 library(TwoSampleMR)
-cis_eQTL <- fread("D:/R Packages and project/R project/MR_test/Aortic/2019-12-11-cis-eQTLsFDR0.05-ProbeLevel-CohortInfoRemoved-BonferroniAdded.txt/cis_eQTL.txt",
+cis_eQTL <- fread("D:/R Packages and project/R project/MR_test/Ovary/2019-12-11-cis-eQTLsFDR0.05-ProbeLevel-CohortInfoRemoved-BonferroniAdded.txt/cis_eQTL.txt",
                   header=T,check.names=F,sep="\t")
 library(openxlsx)
 drugable_target <- read.xlsx("D:/R Packages and project/R project/MR_test/Aortic/drugable_target.xlsx")
