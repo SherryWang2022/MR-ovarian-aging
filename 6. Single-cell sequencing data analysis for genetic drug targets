@@ -1,0 +1,40 @@
+Single-cell sequencing data analysis for genetic drug targets
+library(tidyverse)
+library(dplyr)
+library(magrittr)
+library(limma)
+library(openxlsx)
+Cluster <- read.xlsx("Cluster.xlsx")
+target_gene <- c("BRCA1","KLHL18", "PDIA3","PNP","SRPK1")
+data_target = data[rownames(data) %in% target_gene, ]
+data_target <- as.data.frame(t(data_target))
+data_target$cell <- rownames(data_target)
+data_target_cluster <- merge(data_target, Cluster, by = "cell")
+
+data_target_cluster_final <- data.frame()
+for (i in 1:4) {
+  data_target_cluster$gene <- colnames(data_target_cluster)[i+1]
+  data_target_cluster$expression <- data_target_cluster[,i+1]
+  data_target_cluster_final <- rbind(data_target_cluster_final,data_target_cluster)
+}
+write.xlsx(data_target_cluster_final[,6:11], file = "data_target_cluster_final.xlsx")
+
+df <- read.xlsx("data_target_cluster_final.xlsx")
+df$group <- df$aging
+df$group <- factor(df$group, levels = c("Y", "O"))
+df <- subset(df, cluster %in% c("Oocyte","Granulosa cell", "Stromal cell", "Smooth muscle cell",
+                                "Endothelial cell", "Natural killer T cell", "Macrophage"))
+df$cluster<- factor(df$cluster, levels = c("Oocyte","Granulosa cell", "Stromal cell", "Smooth muscle cell",
+                                           "Endothelial cell", "Natural killer T cell", "Macrophage"))
+df$gene <- factor(df$gene, levels = c("BRCA1","KLHL18", "PDIA3","SRPK1"))
+
+library(rstatix)
+stat.test <- df %>%
+  
+  group_by(cluster, gene) %>%
+  
+  t_test(expression ~ group) %>%
+  
+  add_significance()
+
+stat.test <- stat.test %>% add_xy_position(x = "group")
